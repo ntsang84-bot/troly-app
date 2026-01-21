@@ -1,0 +1,7 @@
+{
+  "name": "Smart Tutor AI",
+  "description": "An advanced learning support tool that analyzes math and science problems from photos or PDFs, providing structured theories and infographic-style solutions.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
