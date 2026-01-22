@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MathGuru AI - Trợ lý Thầy Sang</title>
+    <title>MathMaster AI - Trợ lý Thầy Sang</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lexend:wght@400;700;900&display=swap" rel="stylesheet">
@@ -33,14 +33,14 @@
 
     <style>
         :root {
-            --primary: #2563eb;
-            --secondary: #7c3aed;
-            --bg-main: #f8fafc;
+            --primary: #3b82f6;
+            --secondary: #6366f1;
+            --bg-main: #fcfdfe;
         }
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg-main);
-            color: #334155;
+            color: #1e293b;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
@@ -48,9 +48,9 @@
         .font-heading { font-family: 'Lexend', sans-serif; }
         
         .glass-header {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(37, 99, 235, 0.1);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.1);
         }
 
         .formula-card {
@@ -58,34 +58,30 @@
             align-items: center;
             justify-content: center;
             background: #ffffff;
-            border: 2px solid #f1f5f9;
-            padding: 0.6rem 1.2rem;
-            margin: 0.3rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem 1rem;
+            margin: 0.25rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             vertical-align: middle;
             max-width: 100%;
             overflow-x: auto;
         }
         
         .mjx-container svg {
-            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.03));
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.02));
         }
 
         .safe-pb { padding-bottom: env(safe-area-inset-bottom, 24px); }
         .safe-pt { padding-top: env(safe-area-inset-top, 0px); }
 
         .btn-vibrant {
-            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .btn-vibrant:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
-        }
-
-        .card-shadow {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.03), 0 10px 10px -5px rgba(0, 0, 0, 0.01);
+            box-shadow: 0 12px 24px -6px rgba(59, 130, 246, 0.4);
         }
 
         .fade-up {
