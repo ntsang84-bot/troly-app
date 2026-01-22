@@ -4,6 +4,7 @@ import { AnalysisResult, AppStatus, FileData } from './types';
 import { solveWithAI } from './services/geminiService';
 import MathContent from './components/MathContent';
 import LoadingScreen from './components/LoadingScreen';
+import ApiKeySettings from './components/ApiKeySettings';
 
 const App: React.FC = () => {
   const [file, setFile] = useState<FileData | null>(null);
@@ -11,8 +12,8 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<AppStatus>('idle');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Ref cụ thể cho phần "Trình bày Chi tiết" để chỉ lưu phần này thành ảnh
   const detailedStepRef = useRef<HTMLDivElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +47,14 @@ const App: React.FC = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error(err);
-      setError("Thầy chưa giải mã được bài này. Em lưu ý: Gửi từng bài một, ảnh chụp rõ nét và đủ sáng nhé!");
+      if (err.message === "NO_API_KEY") {
+        setError("⚠️ AI đang tắt vì em chưa nhập API Key. Hãy nhấn vào biểu tượng cài đặt phía trên nhé!");
+        setIsSettingsOpen(true);
+      } else if (err.message === "API_ERROR") {
+        setError("❌ Lỗi kết nối với máy chủ AI. Có thể API Key của em đã hết hạn hoặc sai.");
+      } else {
+        setError("Thầy chưa giải mã được bài này. Em lưu ý: Gửi từng bài một, ảnh chụp rõ nét và đủ sáng nhé!");
+      }
       setStatus('error');
     }
   };
@@ -57,10 +65,7 @@ const App: React.FC = () => {
       // @ts-ignore
       const dataUrl = await window.htmlToImage.toPng(detailedStepRef.current, {
         backgroundColor: '#ffffff',
-        style: {
-          padding: '40px',
-          borderRadius: '0px'
-        },
+        style: { padding: '40px', borderRadius: '0px' },
         pixelRatio: 3
       });
       const link = document.createElement('a');
@@ -83,6 +88,8 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#fcfdfe] safe-pb">
+      <ApiKeySettings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 glass-header safe-pt no-print">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -96,6 +103,13 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex space-x-2">
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition-transform"
+              title="Cài đặt API Key"
+            >
+              <i className="fas fa-cog"></i>
+            </button>
             {status !== 'idle' && (
               <button onClick={reset} className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition-transform">
                 <i className="fas fa-plus"></i>
@@ -163,11 +177,6 @@ const App: React.FC = () => {
                 <span>Phân tích bài tập</span>
               </button>
             </div>
-            
-            {/* Branding Footer for Idle State */}
-            <div className="text-center opacity-30 py-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">Bản quyền thuộc về Thầy Sang - THPT Mang Thít</p>
-            </div>
           </div>
         )}
 
@@ -179,7 +188,10 @@ const App: React.FC = () => {
               <i className="fas fa-triangle-exclamation text-3xl"></i>
             </div>
             <p className="text-slate-600 font-bold px-8 leading-relaxed italic">{error}</p>
-            <button onClick={reset} className="px-10 py-5 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-slate-700 transition-colors">Gửi lại ảnh khác</button>
+            <div className="flex flex-col space-y-3 items-center">
+              <button onClick={reset} className="w-full max-w-xs py-5 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">Thử lại bài khác</button>
+              <button onClick={() => setIsSettingsOpen(true)} className="text-blue-600 text-xs font-black uppercase tracking-widest">Cài đặt API Key</button>
+            </div>
           </div>
         )}
 
@@ -196,6 +208,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="px-6 space-y-16">
+              {/* Steps render as before... */}
               {/* Step 1: Phân tích */}
               <section className="space-y-6">
                 <div className="flex items-center space-x-4">
@@ -252,16 +265,13 @@ const App: React.FC = () => {
                 </div>
               </section>
 
-              {/* Step 3: Chi tiết (PHẦN NÀY ĐƯỢC LƯU THÀNH ẢNH) */}
+              {/* Step 3: Chi tiết */}
               <section className="space-y-8" ref={detailedStepRef}>
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center font-black shadow-sm">3</div>
                   <h3 className="text-xl font-black uppercase tracking-tight font-heading text-slate-800">Trình bày Tự luận Chi tiết</h3>
                 </div>
                 <div className="bg-white p-10 rounded-[2.5rem] border-2 border-slate-100 shadow-sm space-y-8 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                      <i className="fas fa-file-pen text-8xl -rotate-12"></i>
-                   </div>
                    <h4 className="text-xl font-black text-violet-700 italic leading-snug">{result.detailedMethod.title}</h4>
                    <div className="space-y-8">
                     {result.detailedMethod.steps.map((step, si) => (
@@ -270,11 +280,6 @@ const App: React.FC = () => {
                         <div className="pt-0.5"><MathContent content={step} className="text-base text-slate-600 font-bold leading-relaxed" /></div>
                       </div>
                     ))}
-                  </div>
-                  <div className="pt-10 mt-6 border-t border-slate-50 text-center">
-                    <div className="bg-slate-50 inline-block px-8 py-3 rounded-2xl">
-                      <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 italic">Lưu bởi MathMaster AI - Thầy Sang THPT Mang Thít</p>
-                    </div>
                   </div>
                 </div>
               </section>
@@ -290,21 +295,12 @@ const App: React.FC = () => {
                     <div key={i} className="space-y-8">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="p-8 bg-white rounded-[2rem] border border-rose-100 shadow-sm relative">
-                           <div className="absolute -top-3 left-8 px-4 py-1 bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-md">Lỗi hay gặp</div>
+                           <div className="absolute -top-3 left-8 px-4 py-1 bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Lỗi hay gặp</div>
                            <MathContent content={m.wrong} className="text-sm text-slate-400 font-bold line-through italic" />
                         </div>
                         <div className="p-8 bg-white rounded-[2rem] border border-emerald-100 shadow-sm relative">
-                           <div className="absolute -top-3 left-8 px-4 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-md">Giải đúng là</div>
+                           <div className="absolute -top-3 left-8 px-4 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Giải đúng là</div>
                            <MathContent content={m.right} className="text-sm text-slate-800 font-black" />
-                        </div>
-                      </div>
-                      <div className="p-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-[2rem] shadow-2xl flex items-center space-x-6">
-                        <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-                          <i className="fas fa-lightbulb text-2xl"></i>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Mẹo hay từ Thầy Sang</p>
-                          <p className="text-base font-black italic leading-tight">{m.tip}</p>
                         </div>
                       </div>
                     </div>
@@ -313,46 +309,20 @@ const App: React.FC = () => {
               </section>
             </div>
 
-            {/* Copyright & Actions Footer */}
+            {/* Footer with Actions */}
             <footer className="px-6 py-12 text-center space-y-10">
-              <div className="space-y-3">
-                <div className="w-20 h-px bg-slate-100 mx-auto"></div>
-                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Tác giả & Bản quyền</p>
-                <p className="text-sm font-black text-slate-700 font-heading">Thầy Sang - THPT Mang Thít</p>
-                <p className="text-[10px] font-bold text-slate-300 italic">"Học hiểu bản chất - Kiến tạo tương lai"</p>
-              </div>
-
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 no-print">
-                <button 
-                  onClick={reset} 
-                  className="w-full sm:w-auto px-12 py-5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
-                >
-                  Giải bài toán khác
-                </button>
-                <button 
-                  onClick={saveDetailedSolutionAsImage} 
-                  className="w-full sm:w-auto px-12 py-5 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-100 active:scale-95 transition-all flex items-center justify-center space-x-3"
-                >
-                  <i className="fas fa-download text-sm"></i>
+                <button onClick={reset} className="w-full sm:w-auto px-12 py-5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl">Giải bài khác</button>
+                <button onClick={saveDetailedSolutionAsImage} className="w-full sm:w-auto px-12 py-5 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl flex items-center justify-center space-x-3">
+                  <i className="fas fa-download"></i>
                   <span>Lưu ảnh tự luận</span>
                 </button>
               </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic">Thầy Sang - THPT Mang Thít</p>
             </footer>
           </div>
         )}
       </main>
-
-      {/* Floating CTA for Mobile */}
-      {status === 'success' && (
-        <div className="fixed bottom-8 right-6 no-print sm:hidden flex flex-col space-y-4">
-           <button onClick={saveDetailedSolutionAsImage} className="w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform">
-             <i className="fas fa-download text-2xl"></i>
-           </button>
-           <button onClick={reset} className="w-16 h-16 bg-slate-900 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform">
-             <i className="fas fa-plus text-2xl"></i>
-           </button>
-        </div>
-      )}
     </div>
   );
 };
