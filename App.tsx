@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { AnalysisResult, AppStatus, FileData } from './types';
 import { solveWithAI } from './services/geminiService';
+import { solveLocally } from './services/localSolver';
 import MathContent from './components/MathContent';
 import LoadingScreen from './components/LoadingScreen';
 import ApiKeySettings from './components/ApiKeySettings';
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [mode, setMode] = useState<'ai' | 'local' | null>(null);
   
   const detailedStepRef = useRef<HTMLDivElement>(null);
 
@@ -37,23 +39,41 @@ const App: React.FC = () => {
     if (!file && !textInput.trim()) return;
     setStatus('loading');
     setError(null);
-    try {
-      const response = await solveWithAI(
-        textInput, 
-        file ? { data: file.base64!, mimeType: file.mimeType! } : undefined
-      );
-      setResult(response);
+    setMode(null);
+
+    const apiKey = localStorage.getItem("USER_API_KEY");
+
+    // 1. Nếu có API Key, thử gọi AI trước
+    if (apiKey) {
+      try {
+        const response = await solveWithAI(
+          textInput, 
+          file ? { data: file.base64!, mimeType: file.mimeType! } : undefined
+        );
+        setResult(response);
+        setMode('ai');
+        setStatus('success');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      } catch (err) {
+        console.warn("AI Error, falling back to Local:", err);
+        // Nếu AI lỗi, tiếp tục xuống bước 2 (Local)
+      }
+    }
+
+    // 2. Chế độ Local (Logic có sẵn) hoặc Fallback
+    const localResponse = solveLocally(textInput);
+    if (localResponse) {
+      setResult(localResponse);
+      setMode('local');
       setStatus('success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: any) {
-      console.error(err);
-      if (err.message === "NO_API_KEY") {
-        setError("⚠️ AI đang tắt vì em chưa nhập API Key. Hãy nhấn vào biểu tượng cài đặt phía trên nhé!");
-        setIsSettingsOpen(true);
-      } else if (err.message === "API_ERROR") {
-        setError("❌ Lỗi kết nối với máy chủ AI. Có thể API Key của em đã hết hạn hoặc sai.");
+    } else {
+      // Nếu cả 2 đều không có kết quả
+      if (apiKey) {
+        setError("AI gặp lỗi và thầy chưa có lời giải sẵn cho bài này. Em kiểm tra lại Key nhé!");
       } else {
-        setError("Thầy chưa giải mã được bài này. Em lưu ý: Gửi từng bài một, ảnh chụp rõ nét và đủ sáng nhé!");
+        setError("Thầy chưa có lời giải sẵn cho bài này. Em hãy nhập API Key để dùng AI nâng cao (miễn phí) nhé!");
       }
       setStatus('error');
     }
@@ -69,12 +89,11 @@ const App: React.FC = () => {
         pixelRatio: 3
       });
       const link = document.createElement('a');
-      link.download = `LoiGiaiTuLuan-Thầy-Sang-${Date.now()}.png`;
+      link.download = `MathGuru-LoiGiai-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
-      console.error('Lỗi khi lưu ảnh:', err);
-      alert('Không thể tạo ảnh, em hãy chụp màn hình phần lời giải này nhé!');
+      alert('Không thể tạo ảnh, em hãy chụp màn hình nhé!');
     }
   };
 
@@ -84,6 +103,7 @@ const App: React.FC = () => {
     setResult(null);
     setStatus('idle');
     setError(null);
+    setMode(null);
   };
 
   return (
@@ -105,10 +125,11 @@ const App: React.FC = () => {
           <div className="flex space-x-2">
             <button 
               onClick={() => setIsSettingsOpen(true)}
-              className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition-transform"
-              title="Cài đặt API Key"
+              className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition-transform relative"
+              title="Cài đặt AI"
             >
-              <i className="fas fa-cog"></i>
+              <i className="fas fa-robot"></i>
+              {localStorage.getItem("USER_API_KEY") && <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-white"></span>}
             </button>
             {status !== 'idle' && (
               <button onClick={reset} className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center active:scale-90 transition-transform">
@@ -140,13 +161,13 @@ const App: React.FC = () => {
                     <i className="fas fa-camera text-3xl"></i>
                   </div>
                   <span className="text-sm font-black text-blue-500 uppercase tracking-widest">Chụp ảnh bài tập</span>
-                  <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-tight italic">Mỗi lần gửi 01 bài, ảnh rõ nét</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-tight italic">Ưu tiên ảnh rõ nét, từng bài một</p>
                   <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                 </label>
               ) : (
                 <div className="relative rounded-[2rem] overflow-hidden border border-blue-50 min-h-[250px] bg-slate-50 flex items-center justify-center shadow-inner">
                   <img src={file.previewUrl} className="w-full h-full object-contain p-4" alt="Preview" />
-                  <button onClick={() => setFile(null)} className="absolute top-6 right-6 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-red-500 shadow-xl border border-red-50">
+                  <button onClick={() => setFile(null)} className="absolute top-6 right-6 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-red-500 shadow-xl">
                     <i className="fas fa-trash-can text-sm"></i>
                   </button>
                 </div>
@@ -155,16 +176,11 @@ const App: React.FC = () => {
               <div className="space-y-4">
                 <div className="bg-slate-50 rounded-[1.5rem] p-6 border border-transparent focus-within:border-blue-200 focus-within:bg-white transition-all shadow-sm">
                   <textarea 
-                    placeholder="Ghi chú cho thầy (VD: Giải theo cách lớp 12, cách nhanh nhất...)" 
+                    placeholder="Ghi chú thêm cho thầy (VD: 'Giải xác suất', 'Đạo hàm lớp 11'...)" 
                     className="w-full h-24 bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700 placeholder:text-slate-300 resize-none"
                     value={textInput}
                     onChange={(e) => setTextInput(e.target.value)}
                   />
-                </div>
-                
-                <div className="flex items-center space-x-3 text-amber-600 bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                  <i className="fas fa-circle-exclamation text-sm shrink-0"></i>
-                  <p className="text-[11px] font-black uppercase tracking-tight leading-tight">Lưu ý quan trọng: Mỗi lần gửi 01 bài duy nhất, ảnh chụp cần rõ nét để thầy giải chính xác nhất.</p>
                 </div>
               </div>
 
@@ -174,7 +190,7 @@ const App: React.FC = () => {
                 className="w-full btn-vibrant text-white py-6 rounded-[1.5rem] text-sm font-black uppercase tracking-widest shadow-xl shadow-blue-100 hover:brightness-110 active:scale-[0.98] disabled:opacity-30 transition-all flex items-center justify-center space-x-3"
               >
                 <i className="fas fa-wand-magic-sparkles text-lg"></i>
-                <span>Phân tích bài tập</span>
+                <span>Bắt đầu giải toán</span>
               </button>
             </div>
           </div>
@@ -189,15 +205,21 @@ const App: React.FC = () => {
             </div>
             <p className="text-slate-600 font-bold px-8 leading-relaxed italic">{error}</p>
             <div className="flex flex-col space-y-3 items-center">
-              <button onClick={reset} className="w-full max-w-xs py-5 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">Thử lại bài khác</button>
-              <button onClick={() => setIsSettingsOpen(true)} className="text-blue-600 text-xs font-black uppercase tracking-widest">Cài đặt API Key</button>
+              <button onClick={reset} className="w-full max-w-xs py-5 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">Quay lại</button>
+              <button onClick={() => setIsSettingsOpen(true)} className="text-blue-600 text-xs font-black uppercase tracking-widest">Mở cài đặt AI</button>
             </div>
           </div>
         )}
 
         {status === 'success' && result && (
           <div className="space-y-12 pb-24">
-            {/* PROBLEM SUMMARY */}
+            {/* MODE INDICATOR */}
+            <div className="px-6 flex justify-center">
+              <div className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${mode === 'ai' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                {mode === 'ai' ? '🚀 Chế độ: AI Nâng Cao' : '📘 Chế độ: Cơ Bản'}
+              </div>
+            </div>
+
             <div className="px-6">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-10 rounded-[2.5rem] shadow-2xl shadow-blue-100">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-100 opacity-80">Nội dung bài toán</span>
@@ -208,11 +230,10 @@ const App: React.FC = () => {
             </div>
 
             <div className="px-6 space-y-16">
-              {/* Steps render as before... */}
-              {/* Step 1: Phân tích */}
+              {/* Render 4 steps as before */}
               <section className="space-y-6">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center font-black shadow-sm">1</div>
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center font-black">1</div>
                   <h3 className="text-xl font-black uppercase tracking-tight font-heading text-slate-800">Phân tích & Công thức</h3>
                 </div>
                 <div className="space-y-6">
@@ -226,23 +247,18 @@ const App: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {result.analysisAndTheory.formulas.map((f, i) => (
-                      <div key={i} className="bg-amber-50/60 border border-amber-100 p-6 rounded-[2rem] shadow-sm text-center">
+                      <div key={i} className="bg-amber-50/60 border border-amber-100 p-6 rounded-[2rem] text-center">
                         <MathContent content={f.formula} className="text-xl font-black block mb-2 text-amber-900" isBlock />
-                        <div className="inline-block px-3 py-1 bg-amber-100 rounded-full">
-                          <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest leading-none">
-                            <i className="fas fa-bookmark mr-1"></i> {f.note}
-                          </p>
-                        </div>
+                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest leading-none">{f.note}</p>
                       </div>
                     ))}
                   </div>
                 </div>
               </section>
 
-              {/* Step 2: Tối ưu */}
               <section className="bg-emerald-50 border border-emerald-100 rounded-[3rem] p-10 shadow-sm space-y-8">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-emerald-100">2</div>
+                  <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black">2</div>
                   <h3 className="text-xl font-black uppercase tracking-tight font-heading text-emerald-900">Giải pháp Tối ưu</h3>
                 </div>
                 <div className="space-y-8">
@@ -251,25 +267,21 @@ const App: React.FC = () => {
                     {result.optimalMethod.steps.map((step, si) => (
                       <div key={si} className="flex items-start space-x-4">
                         <span className="w-8 h-8 rounded-xl bg-emerald-200/50 flex items-center justify-center text-xs font-black text-emerald-700 shrink-0 border border-emerald-100">{si+1}</span>
-                        <div className="pt-0.5"><MathContent content={step} className="text-base font-bold text-emerald-900/80 leading-relaxed" /></div>
+                        <div className="pt-0.5"><MathContent content={step} className="text-base font-bold text-emerald-900/80" /></div>
                       </div>
                     ))}
                   </div>
-                  <div className="pt-8 border-t border-emerald-200/40">
-                    <div className="bg-white border-4 border-emerald-100 text-emerald-700 p-8 rounded-[2rem] text-center shadow-lg relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-3 italic">Kết quả nhanh</p>
-                      <MathContent content={result.optimalMethod.conclusion} className="text-3xl font-black" />
-                    </div>
+                  <div className="bg-white border-4 border-emerald-100 text-emerald-700 p-8 rounded-[2rem] text-center shadow-lg">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-2">Đáp án nhanh</p>
+                    <MathContent content={result.optimalMethod.conclusion} className="text-3xl font-black" />
                   </div>
                 </div>
               </section>
 
-              {/* Step 3: Chi tiết */}
               <section className="space-y-8" ref={detailedStepRef}>
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center font-black shadow-sm">3</div>
-                  <h3 className="text-xl font-black uppercase tracking-tight font-heading text-slate-800">Trình bày Tự luận Chi tiết</h3>
+                  <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center font-black">3</div>
+                  <h3 className="text-xl font-black uppercase tracking-tight font-heading text-slate-800">Trình bày Tự luận</h3>
                 </div>
                 <div className="bg-white p-10 rounded-[2.5rem] border-2 border-slate-100 shadow-sm space-y-8 relative overflow-hidden">
                    <h4 className="text-xl font-black text-violet-700 italic leading-snug">{result.detailedMethod.title}</h4>
@@ -277,31 +289,29 @@ const App: React.FC = () => {
                     {result.detailedMethod.steps.map((step, si) => (
                       <div key={si} className="flex items-start space-x-5">
                         <span className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-xs font-black text-slate-400 shrink-0">{si+1}</span>
-                        <div className="pt-0.5"><MathContent content={step} className="text-base text-slate-600 font-bold leading-relaxed" /></div>
+                        <div className="pt-0.5"><MathContent content={step} className="text-base text-slate-600 font-bold" /></div>
                       </div>
                     ))}
                   </div>
+                  <div className="pt-8 mt-4 border-t border-slate-50 text-center opacity-30 italic text-[10px] font-bold">Thầy Sang - THPT Mang Thít</div>
                 </div>
               </section>
 
-              {/* Step 4: Cảnh báo */}
               <section className="bg-rose-50/50 border border-rose-100 rounded-[3rem] p-10 space-y-10">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-rose-100">4</div>
+                  <div className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center font-black">4</div>
                   <h3 className="text-xl font-black uppercase tracking-tight text-rose-800 font-heading">Lưu ý & Cảnh báo</h3>
                 </div>
                 <div className="space-y-10">
                   {result.summaryNotes.map((m, i) => (
-                    <div key={i} className="space-y-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="p-8 bg-white rounded-[2rem] border border-rose-100 shadow-sm relative">
-                           <div className="absolute -top-3 left-8 px-4 py-1 bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Lỗi hay gặp</div>
-                           <MathContent content={m.wrong} className="text-sm text-slate-400 font-bold line-through italic" />
-                        </div>
-                        <div className="p-8 bg-white rounded-[2rem] border border-emerald-100 shadow-sm relative">
-                           <div className="absolute -top-3 left-8 px-4 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Giải đúng là</div>
-                           <MathContent content={m.right} className="text-sm text-slate-800 font-black" />
-                        </div>
+                    <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-8 bg-white rounded-[2rem] border border-rose-100 shadow-sm relative">
+                        <div className="absolute -top-3 left-8 px-4 py-1 bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Sai lầm</div>
+                        <MathContent content={m.wrong} className="text-sm text-slate-400 font-bold line-through italic" />
+                      </div>
+                      <div className="p-8 bg-white rounded-[2rem] border border-emerald-100 shadow-sm relative">
+                        <div className="absolute -top-3 left-8 px-4 py-1 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Đúng là</div>
+                        <MathContent content={m.right} className="text-sm text-slate-800 font-black" />
                       </div>
                     </div>
                   ))}
@@ -309,16 +319,15 @@ const App: React.FC = () => {
               </section>
             </div>
 
-            {/* Footer with Actions */}
-            <footer className="px-6 py-12 text-center space-y-10">
+            <footer className="px-6 py-12 text-center space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 no-print">
                 <button onClick={reset} className="w-full sm:w-auto px-12 py-5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl">Giải bài khác</button>
                 <button onClick={saveDetailedSolutionAsImage} className="w-full sm:w-auto px-12 py-5 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl flex items-center justify-center space-x-3">
                   <i className="fas fa-download"></i>
-                  <span>Lưu ảnh tự luận</span>
+                  <span>Lưu lời giải tự luận</span>
                 </button>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic">Thầy Sang - THPT Mang Thít</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">© Thầy Sang THPT Mang Thít</p>
             </footer>
           </div>
         )}
