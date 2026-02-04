@@ -1,39 +1,31 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { AnalysisResult } from "../types";
-
-export async function solveWithAI(
-  prompt: string,
-  image?: { data: string; mimeType: string }
-): Promise<AnalysisResult> {
-
-  const apiKey = localStorage.getItem("USER_API_KEY");
+// services/gemini.ts
+export async function askGemini(prompt: string, apiKey: string) {
   if (!apiKey) {
-    throw new Error("NO_API_KEY");
+    throw new Error("Missing API Key");
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+      }),
+    }
+  );
 
-  const contents: any[] = [];
-
-  if (image) {
-    contents.push({
-      role: "user",
-      parts: [
-        { inlineData: { data: image.data, mimeType: image.mimeType } },
-        { text: prompt || "Giải bài toán trong hình" }
-      ]
-    });
-  } else {
-    contents.push({
-      role: "user",
-      parts: [{ text: prompt }]
-    });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
   }
 
-  const result = await model.generateContent({ contents });
-  const text = result.response.text();
-
-  // ⚠️ Giả định AI trả JSON
-  return JSON.parse(text);
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
